@@ -7,12 +7,12 @@ import re
 # ページ初期設定
 # -------------------------
 st.set_page_config(page_title="電車距離計算アプリ", layout="wide")
-st.title("🚃 郵便番号から公共交通での距離・時間を計算（Google Maps API）")
+st.title("\ud83d\ude83 郵便番号から公共交通での距離・時間を計算（Google Maps API）")
 
 # -------------------------
-# ① APIキーの読み込み
+# 1. APIキーの読み込み
 # -------------------------
-st.header("① Google Maps APIキーをアップロード")
+st.header("\uff11 Google Maps APIキーをアップロード")
 api_file = st.file_uploader("APIキー（1行目）を含む.txtファイル", type="txt")
 
 if not api_file:
@@ -22,15 +22,15 @@ if not api_file:
 try:
     api_key = api_file.readline().decode("utf-8").strip()
     gmaps = googlemaps.Client(key=api_key)
-    st.success("✅ APIキーを読み込みました。")
+    st.success("\u2705 APIキーを読み込みました。")
 except Exception as e:
     st.error(f"APIキーの読み込みに失敗しました：{e}")
     st.stop()
 
 # -------------------------
-# ② 病院名の入力（最大10件）
+# 2. 病院名の入力（最大10件）
 # -------------------------
-st.header("② 病院名を入力（最大10件）")
+st.header("\uff12 病院名を入力（最大10件）")
 default_hospitals = [
     "医仁会武田病院", "宇治武田病院", "康生会武田病院",
     "京都桂病院", "堀川病院", "大津日赤病院"
@@ -43,9 +43,9 @@ for i in range(10):
         hospital_names.append(name)
 
 # -------------------------
-# ③ ファイルアップロード
+# 3. ファイルアップロード
 # -------------------------
-st.header("③ 郵便番号を含むCSVまたはExcelファイルをアップロード")
+st.header("\uff13 郵便番号を含むCSVまたはExcelファイルをアップロード")
 uploaded_file = st.file_uploader("ファイルを選択（CSVまたはExcel）", type=["csv", "xlsx"])
 
 if not uploaded_file:
@@ -64,11 +64,13 @@ st.write("アップロードされたデータ：")
 st.dataframe(df.head())
 
 # -------------------------
-# ④ 郵便番号列の選択と住所取得
+# 4. 郵便番号列の選択と住所取得
 # -------------------------
 postal_col = st.selectbox("郵便番号の列を選んでください", df.columns)
 
-def get_address_from_postal(gmaps, postal_code):
+@st.cache_data
+
+def get_address_from_postal(postal_code):
     try:
         query = f"{postal_code} 日本"
         result = gmaps.geocode(query)
@@ -79,7 +81,7 @@ def get_address_from_postal(gmaps, postal_code):
     except Exception:
         return None
 
-st.header("④ 郵便番号から住所を取得（Geocoding API）")
+st.header("\uff14 郵便番号から住所を取得（Geocoding API）")
 addresses = []
 for code in df[postal_col]:
     if pd.isna(code):
@@ -89,7 +91,7 @@ for code in df[postal_col]:
     if len(code_str) != 7:
         addresses.append(None)
         continue
-    addr = get_address_from_postal(gmaps, code_str)
+    addr = get_address_from_postal(code_str)
     addresses.append(addr)
 
 df["住所"] = addresses
@@ -97,9 +99,9 @@ st.write("取得された住所：")
 st.write(df[["住所"]].head())
 
 # -------------------------
-# ⑤ Directions APIで距離と時間計算
+# 5. Directions APIで距離と時間計算
 # -------------------------
-st.header("⑤ 病院ごとの距離・所要時間（公共交通）を計算")
+st.header("\uff15 病院ごとの距離・所要時間（公共交通）を計算")
 
 for hosp in hospital_names:
     dist_list = []
@@ -137,10 +139,10 @@ for hosp in hospital_names:
     df[f"{hosp}までの時間(min)"] = time_list
 
 # -------------------------
-# ⑥ 結果表示とCSVダウンロード
+# 6. 結果表示とCSVダウンロード
 # -------------------------
-st.header("⑥ 計算結果")
+st.header("\uff16 計算結果")
 st.dataframe(df)
 
 csv = df.to_csv(index=False).encode("utf-8-sig")
-st.download_button("📥 結果をCSVでダウンロード", csv, "distance_result.csv", "text/csv")
+st.download_button("\ud83d\udcc5 結果をCSVでダウンロード", csv, "distance_result.csv", "text/csv")
