@@ -7,12 +7,12 @@ import re
 # ページ初期設定
 # -------------------------
 st.set_page_config(page_title="電車距離計算アプリ", layout="wide")
-st.title("\ud83d\ude83 郵便番号から公共交通での距離・時間を計算（Google Maps API）")
+st.title("郵便番号から公共交通での距離・時間を計算（Google Maps API）")
 
 # -------------------------
 # 1. APIキーの読み込み
 # -------------------------
-st.header("\uff11 Google Maps APIキーをアップロード")
+st.header("① Google Maps APIキーをアップロード")
 api_file = st.file_uploader("APIキー（1行目）を含む.txtファイル", type="txt")
 
 if not api_file:
@@ -22,7 +22,7 @@ if not api_file:
 try:
     api_key = api_file.readline().decode("utf-8").strip()
     gmaps = googlemaps.Client(key=api_key)
-    st.success("\u2705 APIキーを読み込みました。")
+    st.success("✅ APIキーを読み込みました。")
 except Exception as e:
     st.error(f"APIキーの読み込みに失敗しました：{e}")
     st.stop()
@@ -30,7 +30,7 @@ except Exception as e:
 # -------------------------
 # 2. 病院名の入力（最大10件）
 # -------------------------
-st.header("\uff12 病院名を入力（最大10件）")
+st.header("② 病院名を入力（最大10件）")
 default_hospitals = [
     "医仁会武田病院", "宇治武田病院", "康生会武田病院",
     "京都桂病院", "堀川病院", "大津日赤病院"
@@ -45,7 +45,7 @@ for i in range(10):
 # -------------------------
 # 3. ファイルアップロード
 # -------------------------
-st.header("\uff13 郵便番号を含むCSVまたはExcelファイルをアップロード")
+st.header("③ 郵便番号を含むCSVまたはExcelファイルをアップロード")
 uploaded_file = st.file_uploader("ファイルを選択（CSVまたはExcel）", type=["csv", "xlsx"])
 
 if not uploaded_file:
@@ -68,8 +68,6 @@ st.dataframe(df.head())
 # -------------------------
 postal_col = st.selectbox("郵便番号の列を選んでください", df.columns)
 
-@st.cache_data
-
 def get_address_from_postal(postal_code):
     try:
         query = f"{postal_code} 日本"
@@ -81,7 +79,7 @@ def get_address_from_postal(postal_code):
     except Exception:
         return None
 
-st.header("\uff14 郵便番号から住所を取得（Geocoding API）")
+st.header("④ 郵便番号から住所を取得（Geocoding API）")
 addresses = []
 for code in df[postal_col]:
     if pd.isna(code):
@@ -101,7 +99,7 @@ st.write(df[["住所"]].head())
 # -------------------------
 # 5. Directions APIで距離と時間計算
 # -------------------------
-st.header("\uff15 病院ごとの距離・所要時間（公共交通）を計算")
+st.header("⑤ 病院ごとの距離・所要時間（公共交通）を計算")
 
 for hosp in hospital_names:
     dist_list = []
@@ -141,9 +139,8 @@ for hosp in hospital_names:
 # -------------------------
 # 6. 結果表示とCSVダウンロード
 # -------------------------
-st.header("\uff16 計算結果")
+st.header("⑥ 計算結果")
 st.dataframe(df)
 
 csv = df.to_csv(index=False).encode("utf-8-sig")
-st.download_button("\ud83d\udcc5 結果をCSVでダウンロード", csv, "distance_result.csv", "text/csv")
-
+st.download_button("📥 結果をCSVでダウンロード", csv, "distance_result.csv", "text/csv")
