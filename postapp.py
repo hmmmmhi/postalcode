@@ -146,3 +146,4 @@ st.dataframe(df)
 
 csv = df.to_csv(index=False).encode("utf-8-sig")
 st.download_button("\ud83d\udcc5 結果をCSVでダウンロード", csv, "distance_result.csv", "text/csv")
+
