@@ -3,20 +3,20 @@ import pandas as pd
 import googlemaps
 import re
 
-# --------------------------
-# ページ設定
-# --------------------------
+# -------------------------
+# ページ初期設定
+# -------------------------
 st.set_page_config(page_title="電車距離計算アプリ", layout="wide")
-st.title("🚃 郵便番号から電車距離と所要時間を計算（Google Maps API）")
+st.title("🚃 郵便番号から公共交通での距離・時間を計算（Google Maps API）")
 
-# --------------------------
+# -------------------------
 # ① APIキーの読み込み
-# --------------------------
+# -------------------------
 st.header("① Google Maps APIキーをアップロード")
-api_file = st.file_uploader("1行目にAPIキーを記載した .txt ファイルをアップロード", type="txt")
+api_file = st.file_uploader("APIキー（1行目）を含む.txtファイル", type="txt")
 
 if not api_file:
-    st.warning("APIキーが必要です。アップロードしてください。")
+    st.warning("APIキーをアップロードしてください。")
     st.stop()
 
 try:
@@ -27,9 +27,9 @@ except Exception as e:
     st.error(f"APIキーの読み込みに失敗しました：{e}")
     st.stop()
 
-# --------------------------
+# -------------------------
 # ② 病院名の入力（最大10件）
-# --------------------------
+# -------------------------
 st.header("② 病院名を入力（最大10件）")
 default_hospitals = [
     "医仁会武田病院", "宇治武田病院", "康生会武田病院",
@@ -42,11 +42,11 @@ for i in range(10):
     if name:
         hospital_names.append(name)
 
-# --------------------------
+# -------------------------
 # ③ ファイルアップロード
-# --------------------------
+# -------------------------
 st.header("③ 郵便番号を含むCSVまたはExcelファイルをアップロード")
-uploaded_file = st.file_uploader("CSVまたはExcelファイル", type=["csv", "xlsx"])
+uploaded_file = st.file_uploader("ファイルを選択（CSVまたはExcel）", type=["csv", "xlsx"])
 
 if not uploaded_file:
     st.stop()
@@ -60,12 +60,12 @@ except Exception as e:
     st.error(f"ファイルの読み込みに失敗しました：{e}")
     st.stop()
 
-st.write("アップロードされたデータ（先頭5行）:")
+st.write("アップロードされたデータ：")
 st.dataframe(df.head())
 
-# --------------------------
-# ④ 郵便番号列の選択と住所変換
-# --------------------------
+# -------------------------
+# ④ 郵便番号列の選択と住所取得
+# -------------------------
 postal_col = st.selectbox("郵便番号の列を選んでください", df.columns)
 
 def get_address_from_postal(gmaps, postal_code):
@@ -79,29 +79,27 @@ def get_address_from_postal(gmaps, postal_code):
     except Exception:
         return None
 
+st.header("④ 郵便番号から住所を取得（Geocoding API）")
 addresses = []
 for code in df[postal_col]:
-    try:
-        if pd.isna(code):
-            addresses.append(None)
-            continue
-        code_str = re.sub(r"[^\d]", "", str(code))  # ハイフン・空白除去
-        if len(code_str) != 7:
-            addresses.append(None)
-            continue
-        addr = get_address_from_postal(gmaps, code_str)
-        addresses.append(addr)
-    except:
+    if pd.isna(code):
         addresses.append(None)
+        continue
+    code_str = re.sub(r"[^\d]", "", str(code)).strip()
+    if len(code_str) != 7:
+        addresses.append(None)
+        continue
+    addr = get_address_from_postal(gmaps, code_str)
+    addresses.append(addr)
 
 df["住所"] = addresses
-st.write("変換された住所（先頭5行）:")
+st.write("取得された住所：")
 st.write(df[["住所"]].head())
 
-# --------------------------
-# ⑤ 距離と時間の計算（電車）
-# --------------------------
-st.header("⑤ 病院ごとの電車ルート距離と所要時間を計算")
+# -------------------------
+# ⑤ Directions APIで距離と時間計算
+# -------------------------
+st.header("⑤ 病院ごとの距離・所要時間（公共交通）を計算")
 
 for hosp in hospital_names:
     dist_list = []
@@ -128,7 +126,7 @@ for hosp in hospital_names:
                 leg = directions[0]["legs"][0]
                 dist_km = round(leg["distance"]["value"] / 1000, 2)
                 time_min = round(leg["duration"]["value"] / 60)
-        except:
+        except Exception:
             dist_km = None
             time_min = None
 
@@ -138,11 +136,11 @@ for hosp in hospital_names:
     df[f"{hosp}までの距離(km)"] = dist_list
     df[f"{hosp}までの時間(min)"] = time_list
 
-# --------------------------
-# ⑥ 結果表示とダウンロード
-# --------------------------
-st.header("⑥ 計算結果の表示とCSVダウンロード")
+# -------------------------
+# ⑥ 結果表示とCSVダウンロード
+# -------------------------
+st.header("⑥ 計算結果")
 st.dataframe(df)
 
 csv = df.to_csv(index=False).encode("utf-8-sig")
-st.download_button("📥 結果をCSVでダウンロード", csv, "電車距離計算結果.csv", "text/csv")
+st.download_button("📥 結果をCSVでダウンロード", csv, "distance_result.csv", "text/csv")
