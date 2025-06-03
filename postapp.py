@@ -26,14 +26,26 @@ def get_coordinates_by_postal(postal):
         return (result.latitude, result.longitude)
     return None
 
+# デフォルトの病院名（6件）
+default_hospitals = [
+    "医仁会武田病院",
+    "宇治武田病院",
+    "康生会武田病院",
+    "京都桂病院",
+    "堀川病院",
+    "大津日赤病院"
+]
+
 # 病院名の入力（最大10件）
-st.header("① 複数の病院名または住所を入力してください（最大10件）")
+st.header("① 病院名または住所を入力（最大10件）")
 hospital_names = []
-for i in range(1, 11):
-    name = st.text_input(f"病院{i}：", value="" if i > 1 else "京都大学医学部附属病院")
+for i in range(10):
+    default = default_hospitals[i] if i < len(default_hospitals) else ""
+    name = st.text_input(f"病院{i+1}", value=default)
     if name:
         hospital_names.append(name)
 
+# 座標取得
 hospital_coords = {}
 for name in hospital_names:
     coord = get_coordinates_by_name(name)
@@ -47,23 +59,22 @@ st.header("② 郵便番号データのファイルをアップロード")
 uploaded_file = st.file_uploader("CSVまたはExcelファイルを選択してください", type=["csv", "xlsx"])
 
 if uploaded_file:
-    # ファイル読み込み
     try:
         if uploaded_file.name.endswith(".csv"):
             df = pd.read_csv(uploaded_file)
         else:
             df = pd.read_excel(uploaded_file, engine="openpyxl")
     except Exception as e:
-        st.error(f"ファイルの読み込み中にエラーが発生しました：{e}")
+        st.error(f"ファイルの読み込みエラー：{e}")
         st.stop()
 
-    st.write("アップロードされたデータ（先頭5行）：")
+    st.write("アップロードされたデータのプレビュー：")
     st.dataframe(df.head())
 
-    # 郵便番号列を選択
-    postal_col = st.selectbox("郵便番号が記載された列を選んでください", df.columns)
+    # 郵便番号列の選択
+    postal_col = st.selectbox("郵便番号が記載された列を選択してください", df.columns)
 
-    # 各行について、病院ごとの距離を計算
+    # 距離の計算
     for hosp_name, hosp_coord in hospital_coords.items():
         distances = []
         for code in df[postal_col]:
@@ -75,9 +86,8 @@ if uploaded_file:
             distances.append(dist)
         df[f"{hosp_name}までの距離(km)"] = distances
 
-    st.header("③ 距離計算の結果")
+    st.header("③ 計算結果")
     st.dataframe(df)
 
-    # ダウンロード用ファイル作成
     csv = df.to_csv(index=False).encode('utf-8-sig')
     st.download_button("📥 結果をCSVでダウンロード", csv, "distance_result.csv", "text/csv")
