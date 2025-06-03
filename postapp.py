@@ -1,22 +1,22 @@
 import streamlit as st
 import pandas as pd
 import googlemaps
-import pgeocode
+import re
 
-# -----------------------------------------
-# ページ設定
-# -----------------------------------------
+# ------------------------
+# ページ初期設定
+# ------------------------
 st.set_page_config(page_title="電車距離計算アプリ", layout="wide")
-st.title("🚃 郵便番号 → 病院までの電車距離と所要時間（Google Maps API）")
+st.title("🚃 郵便番号から電車での距離・所要時間をGoogle Maps APIで計算")
 
-# -----------------------------------------
+# ------------------------
 # ① APIキーの読み込み
-# -----------------------------------------
-st.header("① Google Maps APIキーをアップロード")
-api_file = st.file_uploader("1行目にAPIキーを含む .txt ファイルをアップロード", type="txt")
+# ------------------------
+st.header("① Google Maps APIキーのアップロード")
+api_file = st.file_uploader("1行目にAPIキーを記載した.txtファイルをアップロード", type="txt")
 
 if not api_file:
-    st.warning("APIキーが必要です。アップロードしてください。")
+    st.warning("APIキーをアップロードしてください。")
     st.stop()
 
 try:
@@ -24,14 +24,13 @@ try:
     gmaps = googlemaps.Client(key=api_key)
     st.success("✅ APIキーを読み込みました。")
 except Exception as e:
-    st.error(f"APIキーの読み込みに失敗しました：{e}")
+    st.error(f"APIキーの読み込みに失敗しました: {e}")
     st.stop()
 
-# -----------------------------------------
+# ------------------------
 # ② 病院名の入力（最大10件）
-# -----------------------------------------
+# ------------------------
 st.header("② 病院名を入力（最大10件）")
-
 default_hospitals = [
     "医仁会武田病院", "宇治武田病院", "康生会武田病院",
     "京都桂病院", "堀川病院", "大津日赤病院"
@@ -43,11 +42,11 @@ for i in range(10):
     if name:
         hospital_names.append(name)
 
-# -----------------------------------------
+# ------------------------
 # ③ ファイルアップロード
-# -----------------------------------------
+# ------------------------
 st.header("③ 郵便番号を含むCSVまたはExcelファイルをアップロード")
-uploaded_file = st.file_uploader("ファイルを選択してください", type=["csv", "xlsx"])
+uploaded_file = st.file_uploader("CSVまたはExcelファイル", type=["csv", "xlsx"])
 
 if not uploaded_file:
     st.stop()
@@ -61,41 +60,43 @@ except Exception as e:
     st.error(f"ファイルの読み込みに失敗しました：{e}")
     st.stop()
 
-st.write("アップロードされたデータ：")
+st.write("アップロードされたデータのプレビュー：")
 st.dataframe(df.head())
 
-# -----------------------------------------
-# ④ 郵便番号列の選択と住所変換
-# -----------------------------------------
-postal_col = st.selectbox("郵便番号の列を選んでください", df.columns)
+# ------------------------
+# ④ 郵便番号列の選択と正規化
+# ------------------------
+postal_col = st.selectbox("郵便番号の列を選択してください", df.columns)
 
-st.header("④ 郵便番号から都道府県＋市区町村へ変換")
-nomi = pgeocode.Nominatim("jp")
+# 郵便番号を正規化して住所に変換（Geocoding API使用）
+st.header("④ 郵便番号から住所取得（Geocoding API）")
 addresses = []
-
 for code in df[postal_col]:
     try:
         if pd.isna(code):
             addresses.append(None)
             continue
-        code_str = str(code).replace("-", "").replace("−", "").strip()
-        result = nomi.query_postal_code(code_str)
-        if pd.isna(result.prefecture_name) or pd.isna(result.place_name):
+        code_str = re.sub(r"[^\d]", "", str(code))  # 数字以外除去
+        if len(code_str) != 7:
             addresses.append(None)
+            continue
+        result = gmaps.geocode(f"日本 {code_str}")
+        if result:
+            addr = result[0]['formatted_address']
         else:
-            address = f"{result.prefecture_name}{result.place_name}"
-            addresses.append(address)
+            addr = None
     except:
-        addresses.append(None)
+        addr = None
+    addresses.append(addr)
 
 df["住所"] = addresses
-st.write("住所変換の例：")
+st.write("取得された住所の例：")
 st.write(df[["住所"]].head())
 
-# -----------------------------------------
-# ⑤ Google Mapsで距離と時間の計算（電車移動）
-# -----------------------------------------
-st.header("⑤ Google Maps APIでルート検索（電車・バスなどの公共交通機関）")
+# ------------------------
+# ⑤ Google Mapsで距離と時間を計算
+# ------------------------
+st.header("⑤ Google Maps APIでルート検索（電車移動）")
 
 for hosp in hospital_names:
     dist_list = []
@@ -111,18 +112,17 @@ for hosp in hospital_names:
             directions = gmaps.directions(
                 origin=origin,
                 destination=hosp,
-                mode="transit",  # 🚃 公共交通機関
+                mode="transit",
                 language="ja",
                 departure_time="now"
             )
             if not directions:
-                dist_list.append(None)
-                time_list.append(None)
-                continue
-
-            leg = directions[0]["legs"][0]
-            dist_km = round(leg["distance"]["value"] / 1000, 2)
-            time_min = round(leg["duration"]["value"] / 60)
+                dist_km = None
+                time_min = None
+            else:
+                leg = directions[0]["legs"][0]
+                dist_km = round(leg["distance"]["value"] / 1000, 2)
+                time_min = round(leg["duration"]["value"] / 60)
         except:
             dist_km = None
             time_min = None
@@ -133,10 +133,10 @@ for hosp in hospital_names:
     df[f"{hosp}までの距離(km)"] = dist_list
     df[f"{hosp}までの時間(min)"] = time_list
 
-# -----------------------------------------
-# ⑥ 結果表示とダウンロード
-# -----------------------------------------
-st.header("⑥ 計算結果の確認")
+# ------------------------
+# ⑥ 結果表示とCSVダウンロード
+# ------------------------
+st.header("⑥ 計算結果の表示とダウンロード")
 st.dataframe(df)
 
 csv = df.to_csv(index=False).encode("utf-8-sig")
