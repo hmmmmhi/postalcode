@@ -99,9 +99,9 @@ st.write("取得された緯度・経度：")
 st.write(df[["緯度経度"]].head())
 
 # -------------------------
-# 5. Directions APIで距離と時間計算
+# 5. Directions APIで距離と時間計算（車移動に変更）
 # -------------------------
-st.header("⑤ 病院ごとの距離・所要時間（公共交通）を計算")
+st.header("⑤ 病院ごとの距離・所要時間（車での移動）を計算")
 
 for hosp in hospital_names:
     dist_list = []
@@ -117,7 +117,7 @@ for hosp in hospital_names:
             directions = gmaps.directions(
                 origin=origin_coord,
                 destination=hosp,
-                mode="transit",
+                mode="driving",  # ← transitからdrivingに変更
                 language="ja"
             )
             if not directions:
@@ -136,6 +136,7 @@ for hosp in hospital_names:
 
     df[f"{hosp}までの距離(km)"] = dist_list
     df[f"{hosp}までの時間(min)"] = time_list
+
 
 # -------------------------
 # 6. 結果表示とCSVダウンロード
