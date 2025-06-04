@@ -64,41 +64,39 @@ st.write("アップロードされたデータ：")
 st.dataframe(df.head())
 
 # -------------------------
-# 4. 郵便番号列の選択と住所取得（修正版）
+# 4. 郵便番号から緯度経度を取得
 # -------------------------
+st.header("④ 郵便番号から緯度・経度を取得（Geocoding API）")
+
 postal_col = st.selectbox("郵便番号の列を選んでください", df.columns)
 
-def get_address_from_postal(postal_code):
+def get_latlng_from_postal(postal_code):
     try:
-        query = f"{postal_code} 日本"
+        query = f"{postal_code}, Japan"
         result = gmaps.geocode(query)
-        if result and "formatted_address" in result[0]:
-            return result[0]["formatted_address"]
+        if result and "geometry" in result[0]:
+            loc = result[0]["geometry"]["location"]
+            return (loc["lat"], loc["lng"])
         else:
             return None
     except Exception:
         return None
 
-st.header("④ 郵便番号から住所を取得（Geocoding API）")
-addresses = []
+latlngs = []
 for code in df[postal_col]:
     if pd.isna(code):
-        addresses.append(None)
+        latlngs.append(None)
         continue
-
     code_str = str(code).strip()
-
-    # 正規表現で「XXX-XXXX」の形式でなければスキップ
     if not re.match(r"^\d{3}-\d{4}$", code_str):
-        addresses.append(None)
+        latlngs.append(None)
         continue
+    latlng = get_latlng_from_postal(code_str)
+    latlngs.append(latlng)
 
-    addr = get_address_from_postal(code_str)
-    addresses.append(addr)
-
-df["住所"] = addresses
-st.write("取得された住所：")
-st.write(df[["住所"]].head())
+df["緯度経度"] = latlngs
+st.write("取得された緯度・経度：")
+st.write(df[["緯度経度"]].head())
 
 # -------------------------
 # 5. Directions APIで距離と時間計算
@@ -109,19 +107,18 @@ for hosp in hospital_names:
     dist_list = []
     time_list = []
 
-    for origin in df["住所"]:
-        if not origin:
+    for origin_coord in df["緯度経度"]:
+        if not origin_coord:
             dist_list.append(None)
             time_list.append(None)
             continue
 
         try:
             directions = gmaps.directions(
-                origin=origin,
+                origin=origin_coord,
                 destination=hosp,
                 mode="transit",
-                language="ja",
-                departure_time="now"
+                language="ja"
             )
             if not directions:
                 dist_km = None
