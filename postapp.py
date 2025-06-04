@@ -64,7 +64,7 @@ st.write("アップロードされたデータ：")
 st.dataframe(df.head())
 
 # -------------------------
-# 4. 郵便番号列の選択と住所取得
+# 4. 郵便番号列の選択と住所取得（修正版）
 # -------------------------
 postal_col = st.selectbox("郵便番号の列を選んでください", df.columns)
 
@@ -85,10 +85,14 @@ for code in df[postal_col]:
     if pd.isna(code):
         addresses.append(None)
         continue
-    code_str = re.sub(r"[^\d]", "", str(code)).strip()
-    if len(code_str) != 7:
+
+    code_str = str(code).strip()
+
+    # 正規表現で「XXX-XXXX」の形式でなければスキップ
+    if not re.match(r"^\d{3}-\d{4}$", code_str):
         addresses.append(None)
         continue
+
     addr = get_address_from_postal(code_str)
     addresses.append(addr)
 
